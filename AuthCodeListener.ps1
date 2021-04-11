@@ -1,6 +1,9 @@
-﻿Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+﻿#########################################################################################
+#  Login script for automated AuthCode login using ADB
+#  Author: prasnaik
+#########################################################################################
+
+Add-Type –AssemblyName System.Speech
 
 $cSource = @'
 using System;
@@ -66,6 +69,7 @@ public static void LeftClickAtPoint(int x, int y)
 }
 }
 '@
+$SpeechSynthesizer = New-Object –TypeName System.Speech.Synthesis.SpeechSynthesizer
 
 Add-Type -TypeDefinition $cSource -ReferencedAssemblies System.Windows.Forms,System.Drawing
 $wshell = New-Object -ComObject wscript.shell;
@@ -108,9 +112,50 @@ function Validate-AuthCodeData($param) {
 }
 
 function Paste-Code($param) {
+    # Hardcoded location on the browser
     [Clicker]::LeftClickAtPoint(1080,450)
     $wshell.SendKeys($param)
-    [System.Windows.Forms.SendKeys]::SendWait('7{ENTER}')
+    [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
+    $SpeechSynthesizer.Speak('Login Completed')
+}
+
+function Send-TapEvent($x,$y) {
+    C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell input tap $x $y
+}
+
+function Send-IntputTextEvent($param) {
+    C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell input text $param
+}
+
+function Invoke-Authenticator {
+    C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell monkey -p com.tcs.totp -c android.intent.category.LAUNCHER 1
+}
+
+function Open-Authenticator {
+    $startTime = Get-Date
+    $SpeechSynthesizer.Speak('Fetching auth code')
+    Invoke-Authenticator
+    # Hardcoded location on the device
+    #C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell input tap 520 1390
+    Send-TapEvent(520,1390)
+    Send-TapEvent(880,1200)
+    # Code to bypass the biometric auth
+    Send-IntputTextEvent("####")
+    Send-TapEvent(520,1390)
+}
+
+function Trigger-AuthCodeFetch {
+  # key code for F2 key:
+  $key = 113    
+    
+  # this is the c# definition of a static Windows API method:
+  $Signature = @'
+    [DllImport("user32.dll", CharSet=CharSet.Auto, ExactSpelling=true)] 
+    public static extern short GetAsyncKeyState(int virtualKeyCode); 
+'@
+
+  Add-Type -MemberDefinition $Signature -Name Keyboard -Namespace PsOneApi
+  [bool]([PsOneApi.Keyboard]::GetAsyncKeyState($key) -eq -32767)
 }
 
 while($TRUE){
@@ -118,11 +163,15 @@ while($TRUE){
    $clip = Get-ClipData
    if(Check-UpdatedClipData($clip)){
         Write-Output "Listening for data..."
+        Write-Output "Press F2 to fetch the Authcode."
    } else {
         if(Validate-AuthCodeData($clip)){
             Paste-Code($clip)
             Set-ClipDataCompletion
         }
+   }
+   if (Trigger-AuthCodeFetch) { 
+        Open-Authenticator 
    }
    Start-Sleep -s 1
 }
