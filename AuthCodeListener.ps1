@@ -82,7 +82,6 @@ function Get-ClipData {
 
 function Set-ClipData($param) {
     $clipdata = C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell am broadcast -a clipper.set -e text $param
-    Write-Output $clipdata
 }
 
 function Set-ClipDataCompletion() {
@@ -117,6 +116,7 @@ function Paste-Code($param) {
     $wshell.SendKeys($param)
     [System.Windows.Forms.SendKeys]::SendWait('{ENTER}')
     $SpeechSynthesizer.Speak('Login Completed')
+    Write-Output "fetched $param on $(Get-Date)"
 }
 
 function Send-TapEvent($x,$y) {
@@ -128,7 +128,8 @@ function Send-IntputTextEvent($param) {
 }
 
 function Invoke-Authenticator {
-    C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell monkey -p com.tcs.totp -c android.intent.category.LAUNCHER 1
+    Start-Sleep -s 5
+    {C:\Users\user\AppData\Local\Android\Sdk\platform-tools\adb.exe shell monkey -p com.tcs.totp -c android.intent.category.LAUNCHER 1} | out-null
 }
 
 function Open-Authenticator {
@@ -140,8 +141,18 @@ function Open-Authenticator {
     Send-TapEvent(520,1390)
     Send-TapEvent(880,1200)
     # Code to bypass the biometric auth
-    Send-IntputTextEvent("####")
+    Send-IntputTextEvent("1245")
     Send-TapEvent(520,1390)
+}
+
+function Intro {
+    Write-Output  "   _____          __  .__           _______       .___      "
+    Write-Output  "  /  _  \  __ ___/  |_|  |__   ____ \   _  \    __| _/____  "
+    Write-Output  " /  /_\  \|  |  \   __\  |  \_/ ___\/  /_\  \  / __ |/ __ \ "
+    Write-Output  "/    |    \  |  /|  | |   Y  \  \___\  \_/   \/ /_/  \ ___/ "
+    Write-Output  "\____|__  /____/ |__| |___|  /\___  >\_____  /\____ | \___ >"
+    Write-Output  "        \/                 \/     \/       \/      \/     \/ "
+    Write-Output "Press F2 to fetch the Authcode."
 }
 
 function Trigger-AuthCodeFetch {
@@ -158,17 +169,14 @@ function Trigger-AuthCodeFetch {
   [bool]([PsOneApi.Keyboard]::GetAsyncKeyState($key) -eq -32767)
 }
 
+Clear-Host []
+Intro
 while($TRUE){
-   Clear-Host []
    $clip = Get-ClipData
-   if(Check-UpdatedClipData($clip)){
-        Write-Output "Listening for data..."
-        Write-Output "Press F2 to fetch the Authcode."
-   } else {
-        if(Validate-AuthCodeData($clip)){
+   if((-Not (Check-UpdatedClipData($clip))) -And (Validate-AuthCodeData($clip))){
             Paste-Code($clip)
             Set-ClipDataCompletion
-        }
+        
    }
    if (Trigger-AuthCodeFetch) { 
         Open-Authenticator 
